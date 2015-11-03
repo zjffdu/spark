@@ -45,6 +45,10 @@ private[sql] object DataSourceStrategy extends Strategy with Logging {
         filters,
         (a, f) => toCatalystRDD(l, a, t.buildScan(a, f))) :: Nil
 
+    case l @ LogicalRelation(baseRelation: TableScan, _) =>
+      execution.PhysicalRDD.createFromDataSource(
+        l.output, toCatalystRDD(l, baseRelation.buildScan()), baseRelation) :: Nil
+
     case PhysicalOperation(projects, filters, l @ LogicalRelation(t: PrunedFilteredScan, _)) =>
       pruneFilterProject(
         l,
@@ -107,10 +111,6 @@ private[sql] object DataSourceStrategy extends Strategy with Logging {
         projects,
         filters,
         (a, f) => t.buildInternalScan(a.map(_.name).toArray, f, t.paths, confBroadcast)) :: Nil
-
-    case l @ LogicalRelation(baseRelation: TableScan, _) =>
-      execution.PhysicalRDD.createFromDataSource(
-        l.output, toCatalystRDD(l, baseRelation.buildScan()), baseRelation) :: Nil
 
     case i @ logical.InsertIntoTable(l @ LogicalRelation(t: InsertableRelation, _),
       part, query, overwrite, false) if part.isEmpty =>

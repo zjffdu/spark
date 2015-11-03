@@ -33,7 +33,6 @@ import org.apache.spark.sql.execution.QueryExecution
  */
 @Experimental
 trait QueryExecutionListener {
-
   /**
    * A callback function that will be called when a query executed successfully.
    * Implementations should guarantee thread-safe.
@@ -63,7 +62,7 @@ trait QueryExecutionListener {
 class ExecutionListenerManager extends Logging {
   private[this] val listeners = ListBuffer.empty[QueryExecutionListener]
   private[this] val lock = new ReentrantReadWriteLock()
-
+  private val j =0
   /** Acquires a read lock on the cache for the duration of `f`. */
   private def readLock[A](f: => A): A = {
     val rl = lock.readLock()

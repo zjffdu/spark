@@ -46,7 +46,12 @@ object ResolvedDataSource extends Logging {
     "org.apache.spark.sql.json" -> classOf[json.DefaultSource].getCanonicalName,
     "org.apache.spark.sql.json.DefaultSource" -> classOf[json.DefaultSource].getCanonicalName,
     "org.apache.spark.sql.parquet" -> classOf[parquet.DefaultSource].getCanonicalName,
-    "org.apache.spark.sql.parquet.DefaultSource" -> classOf[parquet.DefaultSource].getCanonicalName
+    "org.apache.spark.sql.parquet.DefaultSource" ->
+      classOf[parquet.DefaultSource].getCanonicalName,
+    "org.apache.spark.sql.dataset" ->
+      classOf[remote.DefaultSource].getCanonicalName,
+    "org.apache.spark.sql.dataset.DefaultSource" ->
+      classOf[remote.DefaultSource].getCanonicalName
   )
 
   /** Given a provider name, look up the data source class definition. */
@@ -87,6 +92,7 @@ object ResolvedDataSource extends Logging {
       options: Map[String, String]): ResolvedDataSource = {
     val clazz: Class[_] = lookupDataSource(provider)
     def className: String = clazz.getCanonicalName
+    log.info(s"DataSource Class: ${className}")
     val relation = userSpecifiedSchema match {
       case Some(schema: StructType) => clazz.newInstance() match {
         case dataSource: SchemaRelationProvider =>
@@ -128,6 +134,8 @@ object ResolvedDataSource extends Logging {
             Some(dataSchema),
             maybePartitionsSchema,
             caseInsensitiveOptions)
+//        case dataSource : PublicDatasetRelationProvider =>
+//          throw new AnalysisException(s"$className does not allow user-specified schemas.")
         case dataSource: org.apache.spark.sql.sources.RelationProvider =>
           throw new AnalysisException(s"$className does not allow user-specified schemas.")
         case _ =>
