@@ -418,7 +418,7 @@ abstract class HadoopFsRelation private[sql](maybePartitionSpec: Option[Partitio
 
   private var _partitionSpec: PartitionSpec = _
 
-  private class FileStatusCache {
+  class FileStatusCache {
     var leafFiles = mutable.Map.empty[Path, FileStatus]
 
     var leafDirToChildrenFiles = mutable.Map.empty[Path, Array[FileStatus]]
@@ -460,7 +460,7 @@ abstract class HadoopFsRelation private[sql](maybePartitionSpec: Option[Partitio
     }
   }
 
-  private lazy val fileStatusCache = {
+  lazy val fileStatusCache = {
     val cache = new FileStatusCache
     cache.refresh()
     cache

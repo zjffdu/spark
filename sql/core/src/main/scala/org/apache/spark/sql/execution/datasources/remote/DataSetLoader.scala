@@ -7,9 +7,9 @@ import org.apache.spark.sql.{SQLContext, DataFrame}
 
 import scala.collection.mutable
 import scala.collection.immutable.Map
-import org.apache.spark.Logging
+import org.apache.spark.{SparkContext, SparkConf, Logging}
 
-case class RepositoryMetadata(id: String, desc: String, lastUpdated:String,
+case class RepositoryMetadata(id: String, url:String, desc: String, lastUpdated:String,
                               datasets: Map[String, String])
 
 case class DatasetMetadata(id: String, urls: Seq[String], format: String, schemaStr:String,
@@ -40,32 +40,53 @@ case class DatasetMetadata(id: String, urls: Seq[String], format: String, schema
 
 class DatasetLoader(sqlContext: SQLContext) extends Logging {
 
-  val repositories: scala.collection.mutable.Map[String, RepositoryMetadata] =
+  private val repositories: scala.collection.mutable.Map[String, RepositoryMetadata] =
     new mutable.HashMap[String, RepositoryMetadata]()
 
 
   def register(repoId: String, url: String): Unit = {
-    val repoMetadata : RepositoryMetadata = new RepositoryMetadata(repoId, "desc", "" ,
-      Map("a1a" -> "http://dummy", "a2a" -> "http://dummy2"))
-    this.repositories += repoId -> repoMetadata
+    // should use the url to fetch metadata or this repository
+    // hard code here for poc
+    val metadata = RepositoryMetadata(repoId, url, "desc", "2010-01-01",
+      (1 to 10).map(e=>("a" + e +"a" -> "http://dummy-url-for-dataset")).toMap)
+    this.repositories += repoId -> metadata
   }
 
-  // register the built-in repository
+  // register the built-in repositories
   register("libsvm", "http://libsvm")
   register("uci", "http://uci")
 
+  // for poc
+  private val a1a = DatasetMetadata("a1a", Seq("https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/a1a"),
+    "libsvm", "", "1.0", "2010-01-01", "desc")
+  private val a2a = DatasetMetadata("a1a", Seq("https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/a2a"),
+    "libsvm", "", "1.0", "2010-01-01", "desc")
+  private val a3a = DatasetMetadata("a1a", Seq("https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/a3a"),
+    "libsvm", "", "1.0", "2010-01-01", "desc")
+  private val a4a = DatasetMetadata("a1a", Seq("https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary/a4a"),
+    "libsvm", "", "1.0", "2010-01-01", "desc")
 
-  def list(repoId: String): Seq[DatasetMetadata] = {
+  private val datasetForPOC = Map("a1a" -> a1a, "a2a" -> a2a, "a3a" -> a3a, "a4a" -> a4a)
+
+  def list(repoId: String, extended: Boolean = false): Seq[DatasetMetadata] = {
     repositories.get(repoId) match {
       case Some(url) =>
-        Seq(DatasetMetadata("a1a", Seq("http://download1", "http://download2"), "libsvm", "",
-          "v1", "",""))
+        Seq(a1a, a2a, a3a, a4a)
       case None => throw new IOException(s"No such repository, repoId={repoId}")
     }
   }
 
-  def list(): Seq[DatasetMetadata] = {
-    list("repo1")
+  def desc(repoId:String, datasetId: String): DatasetMetadata = {
+    repositories.get(repoId) match {
+      case Some(repo) => repo.datasets.get(datasetId) match {
+        case Some(datasetURL) =>
+          // fetch dataset metadata through the datasetURL
+          // hard code here for poc
+          a1a
+        case None => throw new IOException(s"Unknown dataset, datasetId=${datasetId}")
+      }
+      case None => throw new IOException(s"Unknown repository, repoId=${repoId}")
+    }
   }
 
   private def getMetadata(repoId: String, datasetId: String) : DatasetMetadata = {
@@ -73,10 +94,8 @@ class DatasetLoader(sqlContext: SQLContext) extends Logging {
       case Some(repoMetadata) => repoMetadata.datasets.get(datasetId) match {
         case Some(datasetURL) =>
           // try this url to fetch dataset metadata
-          DatasetMetadata(datasetId, Seq("http://localhost:18088/mysite/a1a"),
-            "libsvm", "", "v1", "", "desc")
-//          DatasetMetadata(datasetId, Seq("https://github.com/databricks/spark-csv/raw/master/src/test/resources/cars.csv"),
-//            "com.databricks.spark.csv", "year:int,make:string,model:string,comment:string,blank:string", "v1", "", "desc")
+          // hard code here for poc
+          datasetForPOC(datasetId)
         case None => throw new IOException(s"Unknown dataset, datasetId={datasetId}")
       }
       case None => throw new IOException(s"Unknown repository, repoId={repoId}" )
@@ -92,7 +111,10 @@ class DatasetLoader(sqlContext: SQLContext) extends Logging {
 }
 
 object DatasetLoader {
+
   def main(args:Array[String]): Unit = {
-    println("hello world")
+
+
+
   }
 }

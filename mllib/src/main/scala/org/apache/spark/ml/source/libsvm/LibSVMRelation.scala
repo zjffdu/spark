@@ -18,6 +18,7 @@
 package org.apache.spark.ml.source.libsvm
 
 import com.google.common.base.Objects
+import org.apache.hadoop.fs.FileStatus
 
 import org.apache.spark.Logging
 import org.apache.spark.annotation.Since
@@ -37,22 +38,32 @@ import org.apache.spark.sql.types.{DoubleType, StructField, StructType}
  */
 private[libsvm] class LibSVMRelation(val path: String, val numFeatures: Int, val vectorType: String)
     (@transient val sqlContext: SQLContext)
-  extends BaseRelation with TableScan with Logging with Serializable {
+  extends HadoopFsRelation with Logging with Serializable {
 
-  override def schema: StructType = StructType(
-    StructField("label", DoubleType, nullable = false) ::
-      StructField("features", new VectorUDT(), nullable = false) :: Nil
-  )
+//  override def schema: StructType = StructType(
+//    StructField("label", DoubleType, nullable = false) ::
+//      StructField("features", new VectorUDT(), nullable = false) :: Nil
+//  )
 
-  override def buildScan(): RDD[Row] = {
-    val sc = sqlContext.sparkContext
-    val baseRdd = MLUtils.loadLibSVMFile(sc, path, numFeatures)
-    val sparse = vectorType == "sparse"
-    baseRdd.map { pt =>
-      val features = if (sparse) pt.features.toSparse else pt.features.toDense
-      Row(pt.label, features)
-    }
-  }
+//  override def buildScan(): RDD[Row] = {
+//    val sc = sqlContext.sparkContext
+//    val baseRdd = MLUtils.loadLibSVMFile(sc, path, numFeatures)
+//    val sparse = vectorType == "sparse"
+//    baseRdd.map { pt =>
+//      val features = if (sparse) pt.features.toSparse else pt.features.toDense
+//      Row(pt.label, features)
+//    }
+//  }
+
+   override def buildScan(requiredColumns: Array[String], inputFiles: Array[FileStatus]): RDD[Row] = {
+     val sc = sqlContext.sparkContext
+     val baseRdd = MLUtils.loadLibSVMFile(sc, path, numFeatures)
+     val sparse = vectorType == "sparse"
+     baseRdd.map { pt =>
+       val features = if (sparse) pt.features.toSparse else pt.features.toDense
+       Row(pt.label, features)
+     }
+   }
 
   override def hashCode(): Int = {
     Objects.hashCode(path, Double.box(numFeatures), vectorType)
@@ -66,6 +77,37 @@ private[libsvm] class LibSVMRelation(val path: String, val numFeatures: Int, val
     case _ =>
       false
   }
+
+  /**
+   * Prepares a write job and returns an [[OutputWriterFactory]].  Client side job preparation can
+   * be put here.  For example, user defined output committer can be configured here
+   * by setting the output committer class in the conf of spark.sql.sources.outputCommitterClass.
+   *
+   * Note that the only side effect expected here is mutating `job` via its setters.  Especially,
+   * Spark SQL caches [[BaseRelation]] instances for performance, mutating relation internal states
+   * may cause unexpected behaviors.
+   *
+   * @since 1.4.0
+   */
+  override def prepareJobForWrite(job: _root_.org.apache.hadoop.mapreduce.Job): _root_.org.apache.spark.sql.sources.OutputWriterFactory = ???
+
+  /**
+   * Base paths of this relation.  For partitioned relations, it should be either root directories
+   * of all partition directories.
+   *
+   * @since 1.4.0
+   */
+  override def paths: Array[String] = Array(path)
+
+  /**
+   * Specifies schema of actual data files.  For partitioned relations, if one or more partitioned
+   * columns are contained in the data files, they should also appear in `dataSchema`.
+   *
+   * @since 1.4.0
+   */
+  override def dataSchema: StructType = StructType(
+    StructField("label", DoubleType, nullable = false) ::
+      StructField("features", new VectorUDT(), nullable = false) :: Nil)
 }
 
 /**
@@ -99,18 +141,34 @@ private[libsvm] class LibSVMRelation(val path: String, val numFeatures: Int, val
  *  @see [[https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/ LIBSVM datasets]]
  */
 @Since("1.6.0")
-class DefaultSource extends RelationProvider with DataSourceRegister {
+class DefaultSource extends HadoopFsRelationProvider with DataSourceRegister {
 
   @Since("1.6.0")
   override def shortName(): String = "libsvm"
 
-  @Since("1.6.0")
-  override def createRelation(sqlContext: SQLContext, parameters: Map[String, String])
-    : BaseRelation = {
-    val path = parameters.getOrElse("path",
-      throw new IllegalArgumentException("'path' must be specified"))
+//  @Since("1.6.0")
+//  override def createRelation(sqlContext: SQLContext, parameters: Map[String, String])
+//    : BaseRelation = {
+//    val path = parameters.getOrElse("path",
+//      throw new IllegalArgumentException("'path' must be specified"))
+//    val numFeatures = parameters.getOrElse("numFeatures", "-1").toInt
+//    val vectorType = parameters.getOrElse("vectorType", "sparse")
+//    new LibSVMRelation(path, numFeatures, vectorType)(sqlContext)
+//  }
+  /**
+   * Returns a new base relation with the given parameters, a user defined schema, and a list of
+   * partition columns. Note: the parameters' keywords are case insensitive and this insensitivity
+   * is enforced by the Map that is passed to the function.
+   *
+   * @param dataSchema Schema of data columns (i.e., columns that are not partition columns).
+   */
+  override def createRelation(sqlContext: SQLContext,
+                              paths: Array[String],
+                              dataSchema: Option[StructType],
+                              partitionColumns: Option[StructType],
+                              parameters: Map[String, String]): HadoopFsRelation = {
     val numFeatures = parameters.getOrElse("numFeatures", "-1").toInt
     val vectorType = parameters.getOrElse("vectorType", "sparse")
-    new LibSVMRelation(path, numFeatures, vectorType)(sqlContext)
+    new LibSVMRelation(paths(0), numFeatures, vectorType)(sqlContext)
   }
 }

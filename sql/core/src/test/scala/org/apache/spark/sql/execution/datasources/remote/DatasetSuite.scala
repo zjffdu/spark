@@ -9,7 +9,7 @@ class DatasetSuite extends QueryTest with SharedSQLContext {
 
   test("reading text file") {
     val datasetLoader = new DatasetLoader(sqlContext)
-    datasetLoader.list()
+//    datasetLoader.list()
   }
 //
 //  test("SQLContext.read.text() API") {

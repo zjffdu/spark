@@ -35,23 +35,24 @@ class DefaultSource extends RelationProvider with DataSourceRegister {
       parameters("remote.lastUpdated"),
       parameters("remote.desc")
     )
-    val remotePath = sqlContext.conf.getConfString("remote.root.dir", "/user/jzhang/remote/") + parameters("remote.id")
+    val remotePath = sqlContext.conf.getConfString("remote.root.dir", "/tmp/remote/") + parameters("remote.id")
     new RemoteRelation(sqlContext, metadata, parameters.filter(!_._1.startsWith("remote."))
-      + ("path"-> remotePath), remotePath)
+      + ("path"-> remotePath),
+      remotePath)
   }
 }
 
 @Experimental
 class RemoteRelation(val sqlContext: SQLContext, metadata: DatasetMetadata,
                      options:Map[String, String], remotePath: String)
-  extends HadoopFsRelation with TableScan with PrunedScan with Logging {
+  extends HadoopFsRelation with Logging {
 
-  private val delegatedRelation: BaseRelation = ResolvedDataSource(
+  private val delegatedRelation: HadoopFsRelation = ResolvedDataSource(
       sqlContext,
       userSpecifiedSchema = metadata.schema,
       partitionColumns = Array.empty[String],
       provider = metadata.format,
-      options).relation
+      options).relation.asInstanceOf[HadoopFsRelation]
 
   private val _dataSchema = metadata.schema
 
@@ -69,11 +70,11 @@ class RemoteRelation(val sqlContext: SQLContext, metadata: DatasetMetadata,
     case _ => delegatedRelation.schema
   }
 
-  val fs = FileSystem.get(sqlContext.sparkContext.hadoopConfiguration)
+  private val fs = FileSystem.get(sqlContext.sparkContext.hadoopConfiguration)
 
   def checkCache() = {
 
-    // delete it for testing
+    // always delete it now, just for testing
     fs.delete(new Path(remotePath), true)
     if (!fs.exists(new Path(remotePath))) {
       fs.mkdirs(new Path(remotePath))
@@ -81,16 +82,12 @@ class RemoteRelation(val sqlContext: SQLContext, metadata: DatasetMetadata,
     if (fs.listStatus(new Path(remotePath)).isEmpty) {
       logInfo("Downloading data from urls:" + metadata.urls)
       download(metadata.urls, remotePath)
+      logInfo("Downloading done")
     }
   }
 
   def download(urls:Seq[String], destFolder:String): Unit = {
-    val output = fs.create(new Path(destFolder + "/a.txt"))
-    import scala.io.Source
-    urls.foreach(url=>{
-      IOUtils.copyBytes(new ReaderInputStream(Source.fromURL(url).reader()), output, fs.getConf)
-      output.close()
-    })
+    RestUtils.download(urls, destFolder, fs)
   }
 
   override private[sql] def buildScan(
@@ -103,13 +100,13 @@ class RemoteRelation(val sqlContext: SQLContext, metadata: DatasetMetadata,
     delegatedRelation.asInstanceOf[HadoopFsRelation].buildScan(requiredColumns, filters, inputFiles)
   }
 
-  override def buildScan(requiredColumns: Array[String]): RDD[Row] = {
-    checkCache()
-    delegatedRelation.asInstanceOf[PrunedScan].buildScan(requiredColumns)
+  override lazy val fileStatusCache = {
+    val cache = new FileStatusCache
+    cache
   }
 
-  override def buildScan(): RDD[Row] = {
-    checkCache()
-    delegatedRelation.asInstanceOf[TableScan].buildScan()
-  }
+//  override def buildScan(): RDD[Row] = {
+//    checkCache()
+//    delegatedRelation.asInstanceOf[TableScan].buildScan()
+//  }
 }
