@@ -37,6 +37,7 @@ import org.apache.spark.{Logging, TaskContext}
  * A Strategy for planning scans over data sources defined using the sources API.
  */
 private[sql] object DataSourceStrategy extends Strategy with Logging {
+
   def apply(plan: LogicalPlan): Seq[execution.SparkPlan] = plan match {
     case PhysicalOperation(projects, filters, l @ LogicalRelation(t: CatalystScan, _)) =>
       pruneFilterProjectRaw(
@@ -62,11 +63,11 @@ private[sql] object DataSourceStrategy extends Strategy with Logging {
 
     // Scanning partitioned HadoopFsRelation
     case PhysicalOperation(projects, filters, l @ LogicalRelation(t: HadoopFsRelation, _))
-        if t.partitionSpec.partitionColumns.nonEmpty =>
+      if t.partitionSpec.partitionColumns.nonEmpty =>
       // We divide the filter expressions into 3 parts
       val partitionColumns = AttributeSet(
         t.partitionColumns.map(c => l.output.find(_.name == c.name).get))
-
+      logInfo(s"Pushdown Filters:${filters}")
       // Only pruning the partition keys
       val partitionFilters = filters.filter(_.references.subsetOf(partitionColumns))
 
@@ -97,7 +98,7 @@ private[sql] object DataSourceStrategy extends Strategy with Logging {
         .map(execution.Filter(_, scan)).getOrElse(scan) :: Nil
 
     // Scanning non-partitioned HadoopFsRelation
-    case PhysicalOperation(projects, filters, l @ LogicalRelation(t: HadoopFsRelation, _)) =>
+    case PhysicalOperation(projects, filters, l@LogicalRelation(t: HadoopFsRelation, _)) =>
       // See buildPartitionedTableScan for the reason that we need to create a shard
       // broadcast HadoopConf.
       val sharedHadoopConf = SparkHadoopUtil.get.conf
@@ -109,16 +110,16 @@ private[sql] object DataSourceStrategy extends Strategy with Logging {
         filters,
         (a, f) => t.buildInternalScan(a.map(_.name).toArray, f, t.paths, confBroadcast)) :: Nil
 
-    case l @ LogicalRelation(baseRelation: TableScan, _) =>
+    case l@LogicalRelation(baseRelation: TableScan, _) =>
       execution.PhysicalRDD.createFromDataSource(
         l.output, toCatalystRDD(l, baseRelation.buildScan()), baseRelation) :: Nil
 
-    case i @ logical.InsertIntoTable(l @ LogicalRelation(t: InsertableRelation, _),
-      part, query, overwrite, false) if part.isEmpty =>
+    case i@logical.InsertIntoTable(l@LogicalRelation(t: InsertableRelation, _),
+    part, query, overwrite, false) if part.isEmpty =>
       execution.ExecutedCommand(InsertIntoDataSource(l, query, overwrite)) :: Nil
 
-    case i @ logical.InsertIntoTable(
-      l @ LogicalRelation(t: HadoopFsRelation, _), part, query, overwrite, false) =>
+    case i@logical.InsertIntoTable(
+    l@LogicalRelation(t: HadoopFsRelation, _), part, query, overwrite, false) =>
       val mode = if (overwrite) SaveMode.Overwrite else SaveMode.Append
       execution.ExecutedCommand(InsertIntoHadoopFsRelation(t, query, mode)) :: Nil
 

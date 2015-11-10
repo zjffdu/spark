@@ -30,11 +30,13 @@ import org.apache.spark.sql.catalyst.trees.TreeNodeRef
  * [[org.apache.spark.sql.catalyst.expressions.Alias Aliases]] are in-lined/substituted if
  * necessary.
  */
-object PhysicalOperation extends PredicateHelper {
+object PhysicalOperation extends PredicateHelper with Logging {
   type ReturnType = (Seq[NamedExpression], Seq[Expression], LogicalPlan)
 
   def unapply(plan: LogicalPlan): Option[ReturnType] = {
+    logInfo(s"plan:${plan}")
     val (fields, filters, child, _) = collectProjectsAndFilters(plan)
+    logInfo(s"fields:${fields},filters:${filters}, child:${child}")
     Some((fields.getOrElse(child.output), filters, child))
   }
 
@@ -56,14 +58,21 @@ object PhysicalOperation extends PredicateHelper {
       (Option[Seq[NamedExpression]], Seq[Expression], LogicalPlan, Map[Attribute, Expression]) =
     plan match {
       case Project(fields, child) if fields.forall(_.deterministic) =>
+        logInfo(s"Project(fields:$${fields}, child:${child}")
         val (_, filters, other, aliases) = collectProjectsAndFilters(child)
         val substitutedFields = fields.map(substitute(aliases)).asInstanceOf[Seq[NamedExpression]]
         (Some(substitutedFields), filters, other, collectAliases(substitutedFields))
 
-      case Filter(condition, child) if condition.deterministic =>
-        val (fields, filters, other, aliases) = collectProjectsAndFilters(child)
-        val substitutedCondition = substitute(aliases)(condition)
-        (fields, filters ++ splitConjunctivePredicates(substitutedCondition), other, aliases)
+      case o @ Filter(condition, child) =>
+        logInfo(s"${condition} deterministic=" + condition.deterministic)
+        if (condition.deterministic ) {
+          val (fields, filters, other, aliases) = collectProjectsAndFilters(child)
+          val substitutedCondition = substitute(aliases)(condition)
+          logInfo(s"substitutedCondition=${substitutedCondition}")
+          (fields, filters ++ splitConjunctivePredicates(substitutedCondition), other, aliases)
+        } else {
+          (None, Nil, o, Map.empty)
+        }
 
       case other =>
         (None, Nil, other, Map.empty)
