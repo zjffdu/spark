@@ -23,13 +23,7 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
 
@@ -115,8 +109,27 @@ abstract class AbstractCommandBuilder {
       }
     }
 
+    if (System.getenv("HDP_VERSION") != null) {
+      // hdp.version could be set through java-opts file, if set we need to replace with
+      // HDP_VERSION one
+      boolean isHdpSet = false;
+      for (int i = 0; i < cmd.size(); i++) {
+        if (cmd.get(i).startsWith("-Dhdp.version=")
+          && cmd.get(i).length() > "-Dhdp.version=".length()) {
+          // hdp.version is already set, so replace it
+          cmd.set(i, "-Dhdp.version=" + System.getenv("HDP_VERSION"));
+          isHdpSet = true;
+        }
+      }
+
+      // if hdp.version is not set, which means no java-opts set it.
+      if (!isHdpSet) {
+        addOptionString(cmd, "-Dhdp.version=" + System.getenv("HDP_VERSION"));
+      }
+    }
+
     cmd.add("-cp");
-    cmd.add(join(File.pathSeparator, buildClassPath(extraClassPath)));
+    cmd.add(join(File.patClienthSeparator, buildClassPath(extraClassPath)));
     return cmd;
   }
 
