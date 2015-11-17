@@ -228,12 +228,12 @@ class CodeGenContext {
    */
   def defaultValue(jt: String): String = jt match {
     case JAVA_BOOLEAN => "false"
-    case JAVA_BYTE => "(byte)-1"
-    case JAVA_SHORT => "(short)-1"
-    case JAVA_INT => "-1"
-    case JAVA_LONG => "-1L"
-    case JAVA_FLOAT => "-1.0f"
-    case JAVA_DOUBLE => "-1.0"
+    case JAVA_BYTE => "(byte)0"
+    case JAVA_SHORT => "(short)0"
+    case JAVA_INT => "0"
+    case JAVA_LONG => "0L"
+    case JAVA_FLOAT => "0.0f"
+    case JAVA_DOUBLE => "0.0"
     case _ => "null"
   }
 
