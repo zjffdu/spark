@@ -59,5 +59,8 @@ if [ -z "$SPARK_SCALA_VERSION" ]; then
     export SPARK_SCALA_VERSION="2.11"
   else
     export SPARK_SCALA_VERSION="2.10"
-  fi
+  fi	
+
+  if [  `command -v hdp-select` ]; then
+    export HDP_VERSION=`hdp-select status | grep spark-client | awk -F " " '{print $3}'`
 fi
