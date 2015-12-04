@@ -63,4 +63,7 @@ if [ -z "$SPARK_SCALA_VERSION" ]; then
 
   if [  `command -v hdp-select` ]; then
     export HDP_VERSION=`hdp-select status | grep spark-client | awk -F " " '{print $3}'`
+  else
+    echo -e "command hdp-select is not found, please manually export HDP_VERSION in spark-env.sh or current environment" 1>&2
+  fi
 fi
