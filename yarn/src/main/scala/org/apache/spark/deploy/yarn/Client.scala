@@ -778,7 +778,7 @@ private[spark] class Client(
           // SPARK_JAVA_OPTS, we have to replace with HDP_VERSION
           (0 until javaOpts.length).foreach { i =>
             if (javaOpts(i).contains("-Dhdp.version=")) {
-              javaOpts.set(i, s"-Dhdp.version=${sys.env("HDP_VERSION")}")
+              javaOpts.asJava.set(i, s"-Dhdp.version=${sys.env("HDP_VERSION")}")
             }
           }
         } else {
@@ -816,7 +816,7 @@ private[spark] class Client(
           // we have to replace with HDP_VERSION
           (0 until javaOpts.length).foreach { i =>
             if (javaOpts(i).contains("-Dhdp.version=")) {
-              javaOpts.set(i, s"-Dhdp.version=${sys.env("HDP_VERSION")}")
+              javaOpts.asJava.set(i, s"-Dhdp.version=${sys.env("HDP_VERSION")}")
             }
           }
         } else {
