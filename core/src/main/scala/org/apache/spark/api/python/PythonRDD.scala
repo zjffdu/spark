@@ -63,6 +63,15 @@ private[spark] class PythonRDD(
 
   val asJavaRDD: JavaRDD[Array[Byte]] = JavaRDD.fromRDD(this)
 
+  {
+    logInfo("parent:" + parent.toString)
+    logInfo("command:" + command)
+    logInfo("envVars:" + envVars)
+    logInfo("pythonIncludes:" + pythonIncludes)
+    logInfo("pythonExec:" + pythonExec)
+    logInfo("pythonVer:" + pythonVer)
+  }
+
   override def compute(split: Partition, context: TaskContext): Iterator[Array[Byte]] = {
     val runner = new PythonRunner(
       command, envVars, pythonIncludes, pythonExec, pythonVer, broadcastVars, accumulator,
