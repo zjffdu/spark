@@ -23,6 +23,8 @@ import java.util.{UUID, Arrays}
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
+import org.apache.commons.io.IOUtils
+
 import scala.collection.mutable
 import scala.collection.JavaConverters._
 
@@ -90,7 +92,7 @@ private[spark] class PythonWorkerFactory(pythonExec: String, envVars: Map[String
       try {
         val isr = new InputStreamReader(is);
         val br = new BufferedReader(isr);
-        val lines = Source.fromInputStream(is).bufferedReader().lines()
+        val lines = IOUtils.readLines(br)
         output = lines.iterator().asScala.toList
         output.foreach(log.info)
       } catch  {
