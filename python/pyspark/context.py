@@ -180,7 +180,6 @@ class SparkContext(object):
             self._jvm.PythonAccumulatorParam(host, port))
 
         self.pythonExec = os.environ.get("PYSPARK_PYTHON", 'python')
-        print("*************************pythonExec:" + self.pythonExec)
         if self._conf.get("spark.pyspark.virtualenv.enabled") == "true":
           requirements = self._conf.get("spark.pyspark.virtualenv.requirements")
           if not requirements:

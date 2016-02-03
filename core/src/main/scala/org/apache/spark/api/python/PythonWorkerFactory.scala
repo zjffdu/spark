@@ -82,7 +82,7 @@ private[spark] class PythonWorkerFactory(pythonExec: String, envVars: Map[String
     }
   }
 
-  class StreamGobbler(is:InputStream, isError: Boolean) extends Thread {
+  class StreamGobbler(is: InputStream) extends Thread {
 
     var output: List[String] = _
 
@@ -103,29 +103,27 @@ private[spark] class PythonWorkerFactory(pythonExec: String, envVars: Map[String
 
   def setupVirtualEnv(): Unit = {
     virtualEnvDir = Some(UUID.randomUUID().toString)
-    logInfo("**********current working directory=" + new File(".").getAbsolutePath)
-    logInfo("Starting creating virtualenv")
     execCommand(Arrays.asList(conf.get("spark.pyspark.virtualenv.path","virtualenv"),
       "-p", pythonExec,
       "--no-site-packages", virtualEnvDir.get))
-    logInfo("Complete creating virtualenv")
-    logInfo("Starting initing virtualenv")
     val pyspark_requirement =
       if (conf.get("spark.master").contains("local"))
         conf.get("spark.pyspark.virtualenv.requirements")
       else
         conf.get("spark.pyspark.virtualenv.requirements").split("/").last
     execCommand(Arrays.asList(virtualEnvDir.get + "/bin/python", "-m", "pip",
+      "--cache-dir", conf.get("spark.pyspark.virtualenv.cache_dir","/home/yarn"),
       "install", "-r" , pyspark_requirement))
-    logInfo("Finish initing virtualenv")
   }
 
   def execCommand(commands: java.util.List[String]): Unit ={
     val pb = new ProcessBuilder(commands)
+    pb.environment().putAll(envVars.asJava)
+    pb.environment().putAll(System.getenv())
     val proc = pb.start()
-    val stderr = new StreamGobbler(proc.getErrorStream, true)
+    val stderr = new StreamGobbler(proc.getErrorStream)
     stderr.start()
-    val stdin = new StreamGobbler(proc.getInputStream, false)
+    val stdin = new StreamGobbler(proc.getInputStream)
     stdin.start()
     val exitCode = proc.waitFor()
     if (exitCode != 0) {
