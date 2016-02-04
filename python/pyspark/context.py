@@ -180,13 +180,13 @@ class SparkContext(object):
             self._jvm.PythonAccumulatorParam(host, port))
 
         self.pythonExec = os.environ.get("PYSPARK_PYTHON", 'python')
-        if self._conf.get("spark.pyspark.virtualenv.enabled") == "true":
-          requirements = self._conf.get("spark.pyspark.virtualenv.requirements")
+        if self._conf.get("spark.pyspark.anaconda.enabled") == "true":
+          requirements = self._conf.get("spark.pyspark.anaconda.requirements")
           if not requirements:
               raise Exception("spark.pyspark.virtualenv.enabled is set as true but no value for "
               "spark.pyspark.virtualenv.requirements")
           else:
-              self.addPyFile(self._conf.get("spark.pyspark.virtualenv.requirements"))
+              self.addPyFile(self._conf.get("spark.pyspark.anaconda.requirements"))
 
         self.pythonVer = "%d.%d" % sys.version_info[:2]
 
