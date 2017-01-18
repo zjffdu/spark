@@ -22,6 +22,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import scala.collection.JavaConverters._
 
+import com.google.common.io.Files
+
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.util.Utils
@@ -55,7 +57,9 @@ private[spark] class VirtualEnvFactory(pythonExec: String, conf: SparkConf, isDr
     require(virtualEnvType == "native" || virtualEnvType == "conda",
       s"VirtualEnvType: ${virtualEnvType} is not supported" )
     if (isDriver) {
-      virtualEnvName = "virtualenv_driver"
+      val virtualenv_basedir = Files.createTempDir()
+      virtualenv_basedir.deleteOnExit()
+      virtualEnvName = virtualenv_basedir.getAbsolutePath
     } else {
       virtualEnvName = "virtualenv_" + conf.getAppId + "_" + VIRTUALENV_ID.getAndIncrement()
     }
@@ -63,12 +67,12 @@ private[spark] class VirtualEnvFactory(pythonExec: String, conf: SparkConf, isDr
     // use the absolute path when it is local mode otherwise just use filename as it would be
     // fetched from FileServer
     val pyspark_requirements =
-    if (Utils.isLocalMaster(conf)
-      || (isDriver && conf.get("spark.submit.deployMode") != "cluster")) {
-      conf.get("spark.pyspark.virtualenv.requirements")
-    } else {
-      conf.get("spark.pyspark.virtualenv.requirements").split("/").last
-    }
+      if (Utils.isLocalMaster(conf)
+        || (isDriver && conf.get("spark.submit.deployMode") != "cluster")) {
+        conf.get("spark.pyspark.virtualenv.requirements")
+      } else {
+        conf.get("spark.pyspark.virtualenv.requirements").split("/").last
+      }
 
     val createEnvCommand =
       if (virtualEnvType == "native") {
@@ -77,7 +81,7 @@ private[spark] class VirtualEnvFactory(pythonExec: String, conf: SparkConf, isDr
           "--no-site-packages", virtualEnvName)
       } else {
         Arrays.asList(virtualEnvPath,
-          "create", "--prefix", System.getProperty("user.dir") + "/" + virtualEnvName,
+          "create", "--prefix", virtualEnvName,
           "--file", pyspark_requirements, "-y")
       }
     execCommand(createEnvCommand)
