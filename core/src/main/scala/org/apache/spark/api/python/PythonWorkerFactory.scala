@@ -62,7 +62,7 @@ private[spark] class PythonWorkerFactory(var pythonExec: String,
     sys.env.getOrElse("PYTHONPATH", ""))
 
 
-  if (conf.getBoolean("spark.pyspark.virtualenv.enabled", false)) {
+  if (virtualEnvEnabled) {
     logInfo("virtualenv is enabled, creating virtualenv...")
     val virtualEnvFactory = new VirtualEnvFactory(pythonExec, conf, false)
     pythonExec = virtualEnvFactory.setupVirtualEnv()
@@ -322,7 +322,6 @@ private[spark] class PythonWorkerFactory(var pythonExec: String,
 }
 
 private object PythonWorkerFactory {
-  val VIRTUALENV_ID = new AtomicInteger()
   val PROCESS_WAIT_TIMEOUT_MS = 10000
   val IDLE_WORKER_TIMEOUT_MS = 60000  // kill idle workers after 1 minute
 }

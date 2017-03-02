@@ -44,6 +44,7 @@ from pyspark.profiler import ProfilerCollector, BasicProfiler
 
 if sys.version > '3':
     xrange = range
+    basestring = unicode = str
 
 
 __all__ = ['SparkContext']
@@ -190,12 +191,17 @@ class SparkContext(object):
 
         self.pythonExec = os.environ.get("PYSPARK_PYTHON", 'python')
         if self._conf.get("spark.pyspark.virtualenv.enabled") == "true":
+            self.pythonExec = self._conf.get("spark.pyspark.python", self.pythonExec)
             requirements = self._conf.get("spark.pyspark.virtualenv.requirements")
             virtualEnvBinPath = self._conf.get("spark.pyspark.virtualenv.bin.path")
-            if not requirements:
-                raise Exception("spark.pyspark.virtualenv.enabled is set as true but no value for "
-                                "spark.pyspark.virtualenv.requirements")
-            if not virtualEnvBinPath:
+            virtualEnvType = self._conf.get("spark.pyspark.virtualenv.type", "native")
+            python_version = self._conf.get("spark.pyspark.virtualenv.python_version")
+
+            if virtualEnvType == "conda" and (requirements is None) and python_version is None:
+                raise Exception("Either spark.pyspark.virtualenv.requirements or "
+                                "spark.pyspark.virtualenv.python_version needs to be set when "
+                                "spark.pyspark.virtualenv.type is conda")
+            if virtualEnvBinPath is None:
                 raise Exception("spark.pyspark.virtualenv.enabled is set as true but no value for "
                                 "spark.pyspark.virtualenv.bin.path")
 
@@ -1026,6 +1032,34 @@ class SparkContext(object):
         conf = SparkConf()
         conf.setAll(self._conf.getAll())
         return conf
+
+    def install_packages(self, packages, install_driver = True):
+        """
+        install python packages on all executors and driver through pip
+        :param packages: string for single package or a list of string for multiple packages
+        :param install_driver: whether to install packages in client
+        """
+        if self._conf.get("spark.pyspark.virtualenv.enabled") != "true":
+            raise Exception("install_packages can only use called when "
+                            "spark.pyspark.virtualenv.enabled set as true")
+        if isinstance(packages, basestring):
+            packages = [packages]
+        num_executors = int(self._conf.get("spark.executor.instances"))
+        dummyRDD = self.parallelize(range(num_executors), num_executors)
+        import functools
+        def _run_pip(packages, iterator):
+            import pip
+            pip.main(["install"] + packages)
+
+        # run it in the main thread. Will do it in a separated thread after
+        # https://github.com/pypa/pip/issues/2553 is fixed
+        if install_driver:
+            import threading
+            _run_pip(packages, None)
+            # driver_thread = threading.Thread(target=_run_pip, args=(packages, None),
+            #                                  name='driver_install_thread')
+            # driver_thread.start()
+        dummyRDD.foreachPartition(functools.partial(_run_pip, packages))
 
 
 def _test():
